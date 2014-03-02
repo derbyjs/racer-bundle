@@ -18,7 +18,6 @@ function bundle(file, options, cb) {
   var minify = (options.minify == null) ? util.isProduction : options.minify;
 
   var b = browserify(options);
-  b.require(__dirname + '/index', {expose: 'racer'});
   this.emit('bundle', b);
   b.add(file);
 
