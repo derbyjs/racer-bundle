@@ -18,7 +18,7 @@ function bundle(file, options, cb) {
   var minify = (options.minify == null) ? util.isProduction : options.minify;
 
   var b = browserify(options);
-  this.emit('bundle', b);
+  this.emit('bundle', b, options);
   b.add(file);
 
   b.bundle(options, function(err, source) {
