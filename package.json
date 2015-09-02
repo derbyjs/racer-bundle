@@ -16,8 +16,9 @@
     "url": "https://github.com/codeparty/racer-bundle/issues"
   },
   "dependencies": {
-    "browserify": "^9.0.8",
+    "browserify": "^11.0.1",
     "convert-source-map": "^1.1.1",
+    "racer": "^0.6.0-alpha45",
     "uglify-js": "^2.4.24",
     "watchify": "^3.1.2"
   },
