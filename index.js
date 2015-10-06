@@ -25,65 +25,52 @@ function bundle(file, options, cb) {
   this.emit('bundle', b);
   b.add(file);
 
-  // ignore derby views since they are updated seperately.
-  var w = watchify(b, {delay: 100, ignoreWatch: '**/derby/lib/*_views.js'});
-
-  w.on('log', function (msg) {
-    console.log(file + ' bundled:', msg);
-  });
-
-  // If onRebundle is defined, then we need to watch the bundle for changes
+  // If onRebundle is defined, watch the bundle for changes
   if (options.onRebundle) {
+    var w = watchify(b, {
+      delay: 100,
+      // Ignore derby views since they are updated seperately
+      ignoreWatch: '**/derby/lib/*_views.js'
+    });
+
+    w.on('log', function (msg) {
+      console.log(file + ' bundled:', msg);
+    });
+
     // This gets fired everytime a dependent file is changed
     w.on('update', function(ids) {
       console.log('Files changed:', ids.toString());
-      this.bundle(function(err, source) {
-        if (err) return cb(err);
-        // Extract the source map, which Browserify includes as a comment
-        source = source.toString('utf8');
-        var map = convertSourceMap.fromSource(source).toJSON();
-        source = convertSourceMap.removeComments(source);
-        if (minify) {
-          var minified = minifySource(source, map);
-          options.onRebundle(minified.code, minified.map, options);
-        } else {
-          options.onRebundle(source, map, options);
-        }
-      });
+      callBundle(this, options.onRebundle);
     });
-  }
 
-  // Kick-off the initial bundle
-  w.bundle(function(err, source) {
-    if (err) return cb(err);
-    // Extract the source map, which Browserify includes as a comment
-    source = source.toString('utf8');
-    var map = convertSourceMap.fromSource(source).toJSON();
-    source = convertSourceMap.removeComments(source);
-    if (minify) {
-      var minified = minifySource(source, map);
-      cb(null, minified.code, minified.map);
-    } else {
-      cb(null, source, map);
-    }
-  });
+    callBundle(w, cb);
+  } else {
+    callBundle(b, cb);
+  }
 }
 
-function minifySource(source, map) {
-  // If inSourceMap is a string it is assumed to be a filename, but passing in
-  // as an object avoids the need to make a file
-  var inSourceMap = JSON.parse(map);
-  var result = uglify.minify(source, {
-    fromString: true,
-    outSourceMap: 'map',
-    inSourceMap: inSourceMap
+function callBundle(b, minify, cb) {
+  b.bundle(function(err, buffer) {
+    if (err) return cb(err);
+    // Extract the source map, which Browserify includes as a comment
+    var source = buffer.toString('utf8');
+    var map = convertSourceMap.fromSource(source).toJSON();
+    source = convertSourceMap.removeComments(source);
+    if (!minify) return cb(null, source, map);
+
+    // If inSourceMap is a string it is assumed to be a filename, but passing in
+    // as an object avoids the need to make a file
+    var inSourceMap = JSON.parse(map);
+    var result = uglify.minify(source, {
+      fromString: true,
+      outSourceMap: 'map',
+      inSourceMap: inSourceMap
+    });
+    // Uglify doesn't include the source content in the map, so copy over from
+    // the map that browserify generates
+    var mapObject = JSON.parse(result.map);
+    mapObject.sourcesContent = inSourceMap.sourcesContent;
+    var map = JSON.stringify(mapObject);
+    cb(null, result.code, map);
   });
-  // Uglify doesn't include the source content in the map, so copy over from
-  // the map that browserify generates
-  var mapObject = JSON.parse(result.map);
-  mapObject.sourcesContent = inSourceMap.sourcesContent;
-  return {
-    code: result.code,
-    map: JSON.stringify(mapObject)
-  };
 }
