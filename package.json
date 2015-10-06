@@ -16,15 +16,15 @@
     "url": "https://github.com/codeparty/racer-bundle/issues"
   },
   "dependencies": {
-    "browserify": "^11.0.1",
+    "browserify": "^11.2.0",
     "convert-source-map": "^1.1.1",
     "uglify-js": "^2.4.24",
-    "watchify": "^3.1.2"
+    "watchify": "^3.4.0"
   },
   "devDependencies": {
-    "expect.js": "~0.3.1",
-    "jshint": "~2.4.4",
-    "mocha": "~1.17.1",
+    "expect.js": "^0.3.1",
+    "jshint": "^2.8.0",
+    "mocha": "^2.3.3",
     "racer": "^0.6.0-alpha45"
   }
 }
