@@ -18,7 +18,6 @@
   "dependencies": {
     "browserify": "^11.0.1",
     "convert-source-map": "^1.1.1",
-    "racer": "^0.6.0-alpha45",
     "uglify-js": "^2.4.24",
     "watchify": "^3.1.2"
   },
@@ -26,6 +25,6 @@
     "expect.js": "~0.3.1",
     "jshint": "~2.4.4",
     "mocha": "~1.17.1",
-    "racer": "~0.5.14"
+    "racer": "^0.6.0-alpha45"
   }
 }
