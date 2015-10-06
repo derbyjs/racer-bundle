@@ -40,12 +40,12 @@ function bundle(file, options, cb) {
     // This gets fired everytime a dependent file is changed
     w.on('update', function(ids) {
       console.log('Files changed:', ids.toString());
-      callBundle(this, options.onRebundle);
+      callBundle(this, minify, options.onRebundle);
     });
 
-    callBundle(w, cb);
+    callBundle(w, minify, cb);
   } else {
-    callBundle(b, cb);
+    callBundle(b, minify, cb);
   }
 }
 
