@@ -44,8 +44,8 @@ function bundle(file, options, cb) {
         var map = convertSourceMap.fromSource(source).toJSON();
         source = convertSourceMap.removeComments(source);
         if (minify) {
-          uglified = minifySource(source, map);
-          options.onRebundle(uglified.code, uglified.map, options);
+          var minified = minifySource(source, map);
+          options.onRebundle(minified.code, minified.map, options);
         } else {
           options.onRebundle(source, map, options);
         }
@@ -61,8 +61,8 @@ function bundle(file, options, cb) {
     var map = convertSourceMap.fromSource(source).toJSON();
     source = convertSourceMap.removeComments(source);
     if (minify) {
-      uglified = minifySource(source, map);
-      cb(null, uglified.code, uglified.map);
+      var minified = minifySource(source, map);
+      cb(null, minified.code, minified.map);
     } else {
       cb(null, source, map);
     }
@@ -70,17 +70,18 @@ function bundle(file, options, cb) {
 }
 
 function minifySource(source, map) {
-  uglifyOpts = {};
-  uglifyOpts.fromString = true;
-  uglifyOpts.outSourceMap = 'map';
-  // If inSourceMap is a string it is assumed to be a filename, but passing
-  // in as an object avoids the need to make a file
-  uglifyOpts.inSourceMap = JSON.parse(map);
-  var result = uglify.minify(source, uglifyOpts);
+  // If inSourceMap is a string it is assumed to be a filename, but passing in
+  // as an object avoids the need to make a file
+  var inSourceMap = JSON.parse(map);
+  var result = uglify.minify(source, {
+    fromString: true,
+    outSourceMap: 'map',
+    inSourceMap: inSourceMap
+  });
   // Uglify doesn't include the source content in the map, so copy over from
   // the map that browserify generates
   var mapObject = JSON.parse(result.map);
-  mapObject.sourcesContent = uglifyOpts.inSourceMap.sourcesContent;
+  mapObject.sourcesContent = inSourceMap.sourcesContent;
   return {
     code: result.code,
     map: JSON.stringify(mapObject)
