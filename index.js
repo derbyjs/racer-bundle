@@ -76,7 +76,7 @@ function callBundle(b, minify, cb) {
 }
 
 // returns true if all elements in array1 exist in array2
-function isSubsetl(array1, array2) {
+function isSubset(array1, array2) {
   if (!Array.isArray(array1) || !Array.isArray(array2)) return false;
   var isEqual = array1.every(function(element) {
     return array2.indexOf(element) > -1
