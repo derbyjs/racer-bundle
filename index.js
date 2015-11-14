@@ -17,6 +17,7 @@ function bundle(file, options, cb) {
   options || (options = {});
   options.debug = true;
   var minify = (options.minify == null) ? util.isProduction : options.minify;
+  var ignore = (options.ignore == null) ? [] : options.ignore
   // These objects need to be defined otherwise watchify disables its cache
   options.cache = {};
   options.packageCache = {};
@@ -29,8 +30,6 @@ function bundle(file, options, cb) {
   if (options.onRebundle) {
     var w = watchify(b, {
       delay: 100,
-      // Ignore derby views since they are updated seperately
-      ignoreWatch: '**/derby/lib/*_views.js'
     });
 
     w.on('log', function (msg) {
@@ -40,6 +39,7 @@ function bundle(file, options, cb) {
     // This gets fired everytime a dependent file is changed
     w.on('update', function(ids) {
       console.log('Files changed:', ids.toString());
+      if (isSubset(ids , ignore)) return console.log('Ignoring update');
       callBundle(this, minify, options.onRebundle);
     });
 
@@ -73,4 +73,13 @@ function callBundle(b, minify, cb) {
     var map = JSON.stringify(mapObject);
     cb(null, result.code, map);
   });
+}
+
+// returns true if all elements in array1 exist in array2
+function isSubsetl(array1, array2) {
+  if (!Array.isArray(array1) || !Array.isArray(array2)) return false;
+  var isEqual = array1.every(function(element) {
+    return array2.indexOf(element) > -1
+  });
+  return isEqual;
 }
