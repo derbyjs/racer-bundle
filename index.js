@@ -5,7 +5,8 @@ var convertSourceMap = require('convert-source-map');
 
 var util;
 module.exports = function(racer) {
-  racer.Store.prototype.bundle = bundle;
+  var Backend = racer.Backend || racer.Store;
+  Backend.prototype.bundle = bundle;
   util = racer.util;
 };
 
