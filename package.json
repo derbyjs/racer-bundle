@@ -1,6 +1,6 @@
 {
   "name": "racer-bundle",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Create Browserify package for a Racer or Derby app",
   "main": "index.js",
   "scripts": {
