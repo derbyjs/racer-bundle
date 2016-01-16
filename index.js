@@ -72,6 +72,10 @@ function callBundle(b, minify, cb) {
     var mapObject = JSON.parse(result.map);
     mapObject.sourcesContent = inSourceMap.sourcesContent;
     var map = JSON.stringify(mapObject);
+
+    // Uglify appends the sourceMappingURL to the end of the result.code
+    // but it does not actually point to anything useful so we can remove it
+    result.code = result.code.replace(/\n\/\/#\ssourceMappingURL=map/, '');
     cb(null, result.code, map);
   });
 }
