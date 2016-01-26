@@ -5,10 +5,10 @@ var plugin = require('../index');
 describe('bundle', function() {
 
   it('adds a bundle method to stores', function() {
-    var store = racer.createStore();
-    expect(store.bundle).equal(undefined);
+    var backend = racer.createBackend();
+    expect(backend.bundle).equal(undefined);
     racer.use(plugin);
-    expect(store.bundle).to.be.a('function');
+    expect(backend.bundle).to.be.a('function');
   });
 
 });
