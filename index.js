@@ -1,7 +1,9 @@
+var path = require('path')
 var browserify = require('browserify');
-var uglify = require('uglify-js');
 var watchify = require('watchify');
+var uglify = require('uglify-js');
 var convertSourceMap = require('convert-source-map');
+var anymatch = require('anymatch');
 
 var util;
 module.exports = function(racer) {
@@ -18,7 +20,6 @@ function bundle(file, options, cb) {
   options || (options = {});
   options.debug = true;
   var minify = (options.minify == null) ? util.isProduction : options.minify;
-  var ignore = (options.ignore == null) ? [] : options.ignore
   // These objects need to be defined otherwise watchify disables its cache
   options.cache = {};
   options.packageCache = {};
@@ -37,10 +38,15 @@ function bundle(file, options, cb) {
       console.log(file + ' bundled:', msg);
     });
 
-    // This gets fired everytime a dependent file is changed
+    var ignore = (options.ignore == null) ? [] : options.ignore
+    matchIgnorePaths = anymatch(ignore)
+    // This gets fired every time a dependent file is changed
     w.on('update', function(ids) {
       console.log('Files changed:', ids.toString());
-      if (isSubset(ids , ignore)) return console.log('Ignoring update');
+      // If all the changed files are ignoreable, return before bundling
+      if (ids.every(matchIgnorePaths)) {
+        return console.log('Ignoring update')
+      }
       callBundle(this, minify, options.onRebundle);
     });
 
@@ -74,13 +80,4 @@ function callBundle(b, minify, cb) {
     var map = JSON.stringify(mapObject);
     cb(null, result.code, map);
   });
-}
-
-// returns true if all elements in array1 exist in array2
-function isSubset(array1, array2) {
-  if (!Array.isArray(array1) || !Array.isArray(array2)) return false;
-  var isEqual = array1.every(function(element) {
-    return array2.indexOf(element) > -1
-  });
-  return isEqual;
 }
