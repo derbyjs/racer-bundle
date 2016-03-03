@@ -1,4 +1,5 @@
-var path = require('path')
+var path = require('path');
+var fs = require('fs');
 var browserify = require('browserify');
 var watchify = require('watchify');
 var uglify = require('uglify-js');
@@ -39,6 +40,12 @@ function bundle(file, options, cb) {
     });
 
     var ignore = (options.ignore == null) ? [] : options.ignore
+    // Chokidar/watchify provide the realpath's of files as their ids, so we
+    //  add any realpath values that don't match the provided filepath's.
+    ignore.forEach(function(filepath) {
+      var realpath = fs.realpathSync(filepath);
+      if (realpath !== filepath) ignore.push(realpath);
+    });
     matchIgnorePaths = anymatch(ignore)
     // This gets fired every time a dependent file is changed
     w.on('update', function(ids) {
