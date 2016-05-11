@@ -46,7 +46,7 @@ function bundle(file, options, cb) {
       var realpath = fs.realpathSync(filepath);
       if (realpath !== filepath) ignore.push(realpath);
     });
-    matchIgnorePaths = anymatch(ignore)
+    var matchIgnorePaths = anymatch(ignore)
     // This gets fired every time a dependent file is changed
     w.on('update', function(ids) {
       console.log('Files changed:', ids.toString());
