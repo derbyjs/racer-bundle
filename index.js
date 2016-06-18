@@ -1,7 +1,9 @@
+var fs = require('fs');
 var browserify = require('browserify');
-var uglify = require('uglify-js');
 var watchify = require('watchify');
+var uglify = require('uglify-js');
 var convertSourceMap = require('convert-source-map');
+var anymatch = require('anymatch');
 
 var util;
 module.exports = function(racer) {
@@ -30,17 +32,27 @@ function bundle(file, options, cb) {
   if (options.onRebundle) {
     var w = watchify(b, {
       delay: 100,
-      // Ignore derby views since they are updated seperately
-      ignoreWatch: '**/derby/lib/*_views.js'
     });
 
     w.on('log', function (msg) {
       console.log(file + ' bundled:', msg);
     });
 
-    // This gets fired everytime a dependent file is changed
+    var ignore = (options.ignore == null) ? [] : options.ignore
+    // Chokidar/watchify provide the realpath's of files as their ids, so we
+    //  add any realpath values that don't match the provided filepath's.
+    ignore.forEach(function(filepath) {
+      var realpath = fs.realpathSync(filepath);
+      if (realpath !== filepath) ignore.push(realpath);
+    });
+    var matchIgnorePaths = anymatch(ignore)
+    // This gets fired every time a dependent file is changed
     w.on('update', function(ids) {
       console.log('Files changed:', ids.toString());
+      // If all the changed files are ignoreable, return before bundling
+      if (ids.every(matchIgnorePaths)) {
+        return console.log('Ignoring update')
+      }
       callBundle(this, minify, options.onRebundle);
     });
 
@@ -65,13 +77,22 @@ function callBundle(b, minify, cb) {
     var result = uglify.minify(source, {
       fromString: true,
       outSourceMap: 'map',
-      inSourceMap: inSourceMap
+      inSourceMap: inSourceMap,
+      compress: false
     });
-    // Uglify doesn't include the source content in the map, so copy over from
-    // the map that browserify generates
+
     var mapObject = JSON.parse(result.map);
-    mapObject.sourcesContent = inSourceMap.sourcesContent;
+    // Uglify doesn't include the source content in the map, so copy over from
+    // the map that browserify generates. However, before doing this, we must
+    // first remove any empty sourceContent items since UglifyJS ignores those
+    // files when populating the outSourceMap.sources array.
+    mapObject.sourcesContent = inSourceMap.sourcesContent.filter(isNotEmptyString)
+    if (mapObject.sources.length != mapObject.sourcesContent.length) {
+      console.error('Invalid sourcemap detected. sources.length does not match sourcesContent.length')
+    }
     var map = JSON.stringify(mapObject);
     cb(null, result.code, map);
   });
 }
+
+function isNotEmptyString(str) { return str !== '' }
