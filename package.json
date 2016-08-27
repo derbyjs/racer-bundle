@@ -20,7 +20,7 @@
     "browserify": "^13.0.1",
     "convert-source-map": "^1.1.1",
     "uglify-js": "^2.4.24",
-    "watchify": "^3.4.0"
+    "watchify-with-cache": "^1.0.0"
   },
   "devDependencies": {
     "expect.js": "^0.3.1",
