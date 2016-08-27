@@ -1,14 +1,14 @@
-var fs = require('fs');
-var crypto = require('crypto');
-var browserify = require('browserify');
-var watchify = require('watchify-with-cache');
-var uglify = require('uglify-js');
-var convertSourceMap = require('convert-source-map');
 var anymatch = require('anymatch');
-var path = require('path');
+var browserify = require('browserify');
+var convertSourceMap = require('convert-source-map');
+var crypto = require('crypto');
+var fs = require('fs');
 var os = require('os');
-var util;
+var path = require('path');
 var tmpdir = os.tmpdir()
+var uglify = require('uglify-js');
+var util;
+var watchify = require('watchify-with-cache');
 
 module.exports = function(racer) {
   var Backend = racer.Backend || racer.Store;
