@@ -21,92 +21,70 @@ function bundle(entryFile, options, cb) {
     cb = options;
     options = null;
   }
-  options || (options = {});
-  options.debug = true;
-  options.packageCache = {};
-  // The file paths in ignore should be ignored when monitoring for changes.
-  options.ignore = (options.ignore == null) ? [] : options.ignore
-  options.ignore.forEach(function(filepath) {
-    // NOTE: Chokidar provides the realpath's of files as their ids, so we
-    // have to add any realpath values that don't match the provided filepath's
-    // to our ignore array
-    var realpath = fs.realpathSync(filepath);
-    if (realpath !== filepath) options.ignore.push(realpath);
-  });
 
-  var minify = (options.minify == null) ? util.isProduction : options.minify;
-  options.fullPaths = (options.fullPaths == null) ? !util.isProduction : options.fullPaths;
-
-  // If useCache is defined, we use a persistent cache
   var entryFileHash = hashFilename(entryFile);
-  var bundleCachePath, moduleCachePath;
-  // Allow env var flags to override options
-  var useCache = (process.env.CLEAR_CACHE == null) ? options.useCache : process.env.CLEAR_CACHE;
-  var clearCache = (process.env.USE_CACHE == null) ? options.useCache : process.env.USE_CACHE;
-  if (useCache) {
-    bundleCachePath = path.resolve(tmpdir,  entryFileHash + '.bundle.cache.js');
-    moduleCachePath = path.resolve(tmpdir, entryFileHash + '.modules.cache.json');
-    if (clearCache) {
-      console.log('[racer-bundle] Watchify cache cleared.')
-      fs.writeFileSync(moduleCachePath, '{}');
-    }
-    console.log('[racer-bundle] Loading watchify cache')
-    options.cache = watchify.getCache(moduleCachePath);
-  } else {
-    options.cache = {}
+  var ignorePaths = addRealPaths(options.ignore || []);
+  var matchIgnorePaths = anymatch(ignorePaths);
+  var minify = (options.minify == null) ? util.isProduction : options.minify;
+
+  options.useCache = !!options.useCache || !!process.env.USE_CACHE
+  var bundleCachePath = (options.useCache) ? getBundleCachePath(entryFileHash) : null
+
+  if (options.clearCache || process.env.CLEAR_CACHE) {
+    clearCacheFiles(entryFileHash);
   }
 
-  var b = browserify(options);
-
-  // Echo log messages
+  // Create our browserify instance
+  var b = browserify(getBrowserifyOptions(entryFileHash, options));
+  b.add(entryFile);
   b.on('log', function (msg) {
     console.log(entryFile, 'log:', msg);
   });
-
-  // Add the entryFile
-  b.add(entryFile);
   this.emit('bundle', b);
 
-  // Wrap browserify with caching + watching logic if requested
-  if (options.onRebundle || options.useCache) {
-    b = watchify(b, {
-      delay: 100,
-      cacheFile: moduleCachePath,
-      // The ignored paths should be checked by sha instead of mtime when deciding
-      // if they are invalid. This prevents regenerating the same view partials
-      // from causing a rebundle
-      checkShasum: options.ignore.slice(),
-      watch: !!options.onRebundle
-    });
-    var matchIgnorePaths = anymatch(options.ignore)
-    // Rebundle whenever a file is changed unless explicitly ignored
-    b.on('update', function(ids) {
-      console.log('[racer-bundle] Files changed:', ids.toString());
-      if (ids.every(matchIgnorePaths)) {
-        return console.log('[racer-bundle] File explicitly Ignored. Skipping rebundle');
-      }
-      callBundle(this, bundleCachePath, minify, options.onRebundle);
-    });
+  var _callBundle = callBundle.bind(null, b, bundleCachePath, minify)
+  var initialBundle = _callBundle.bind(null, cb)
+  var rebundle = _callBundle.bind(null, options.onRebundle);
+
+  // Wrap browserify with caching/watching logic if requested
+  var useWatchify = options.onRebundle || options.useCache
+
+  if (options.onRebundle) {
+    wrapBundle(b, entryFileHash, ignorePaths, rebundle)
+  }
+  if (options.useCache) {
+    wrapBundle(b, entryFileHash, ignorePaths)
   }
 
-  callBundle(b, bundleCachePath, minify, cb);
+  initialBundle()
+}
+
+function wrapBundle(b, entryFileHash, ignorePaths, rebundle) {
+  var watchifyOptions = {
+    delay: 100,
+    // The ignored paths should be checked by sha instead of mtime when deciding
+    // if they are invalid. This prevents regenerating the view partials
+    // from causing a rebundle if cached contents are equal
+    checkShasum: ignorePaths,
+    watch: !!rebundle,
+    cacheFile: getModuleCachePath(entryFileHash)
+  };
+  watchify(b, watchifyOptions);
+  // Rebundle whenever a file is changed unless explicitly ignored
+  b.on('update', function(ids) {
+    console.log('[racer-bundle] Files changed:', ids.toString());
+    if (ids.every(matchIgnorePaths)) {
+      console.log('[racer-bundle] File explicitly Ignored. Skipping rebundle');
+    } else {
+      rebundle()
+    }
+  });
 }
 
 function callBundle(b, cachePath, minify, cb) {
-
-  function readOrSetCache(buffer) {
-    if (buffer) {
-      b.write()
-      fs.writeFileSync(cachePath, buffer)
-    } else {
-      buffer = fs.readFileSync(cachePath);
-    }
-    return buffer
-  }
-
   b.bundle(function(err, buffer) {
     if (err) return cb(err);
-    if (cachePath) buffer = readOrSetCache(buffer);
+    if (cachePath) buffer = readOrSetBundleCache(buffer);
     // Extract the source map, which Browserify includes as a comment
     var source = buffer.toString('utf8');
     var map = convertSourceMap.fromSource(source, true).toJSON();
@@ -135,6 +113,62 @@ function callBundle(b, cachePath, minify, cb) {
     var map = JSON.stringify(mapObject);
     cb(null, result.code, map);
   });
+
+  // If buffer is provided, we update our cache and return the buffer.
+  // If no buffer is provided, we return the buffer from our cache.
+  function readOrSetBundleCache(buffer) {
+    if (buffer) {
+      b.write()
+      fs.writeFileSync(cachePath, buffer)
+    } else {
+      buffer = fs.readFileSync(cachePath);
+    }
+    return buffer
+  }
+}
+
+function getBrowserifyOptions(entryFileHash, options) {
+  options = options || {};
+  options.debug = true;
+  options.packageCache = {};
+  if (options.useCache) {
+    options.fullPaths = true;
+    options.cache = getModuleCache(entryFileHash);
+  } else {
+    options.cache = {};
+  }
+  return options
+}
+
+function addRealPaths(filePaths) {
+  filePaths = filePaths.slice()
+  filePaths.forEach(function(filepath) {
+    // NOTE: Chokidar provides the realpath's of files as their ids, so we
+    // have to add any realpath values that don't match the provided filepath's
+    // to our ignore array
+    var realpath = fs.realpathSync(filepath);
+    if (realpath !== filepath) filePaths.push(realpath);
+  });
+  return filePaths
+}
+
+function clearCacheFiles(entryFileHash) {
+  fs.unlinkSync(getModuleCachePath(entryFileHash))
+  fs.unlinkSync(getModuleCachePath(entryFileHash))
+  console.log('[racer-bundle] Watchify cache cleared.')
+}
+
+function getModuleCache(entryFileHash) {
+  console.log('[racer-bundle] Loading watchify cache')
+  watchify.getCache(getModuleCachePath(entryFileHash))
+}
+
+function getModuleCachePath(entryFileHash) {
+  path.resolve(tmpdir, entryFileHash + '.modules.cache.json');
+}
+
+function getBundleCachePath(entryFileHash) {
+  path.resolve(tmpdir, entryFileHash + '.bundle.cache.js');
 }
 
 function isNotEmptyString(str) { return str !== '' }
