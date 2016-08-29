@@ -108,7 +108,7 @@ function callBundle(b, cachePath, minify, cb) {
     // files when populating the outSourceMap.sources array.
     mapObject.sourcesContent = inSourceMap.sourcesContent.filter(isNotEmptyString)
     if (mapObject.sources.length != mapObject.sourcesContent.length) {
-      console.error('Invalid sourcemap detected. sources.length does not match sourcesContent.length')
+      console.error('[racer-bundle] Invalid sourcemap detected. sources.length does not match sourcesContent.length')
     }
     var map = JSON.stringify(mapObject);
     cb(null, result.code, map);
@@ -146,8 +146,10 @@ function addRealPaths(filePaths) {
     // NOTE: Chokidar provides the realpath's of files as their ids, so we
     // have to add any realpath values that don't match the provided filepath's
     // to our ignore array
-    var realpath = fs.realpathSync(filepath);
-    if (realpath !== filepath) filePaths.push(realpath);
+    if (fs.existsSync(filepath)) {
+      var realpath = fs.realpathSync(filepath);
+      if (realpath !== filepath) filePaths.push(realpath);
+    }
   });
   return filePaths
 }
@@ -160,15 +162,15 @@ function clearCacheFiles(entryFileHash) {
 
 function getModuleCache(entryFileHash) {
   console.log('[racer-bundle] Loading watchify cache')
-  watchify.getCache(getModuleCachePath(entryFileHash))
+  return watchify.getCache(getModuleCachePath(entryFileHash))
 }
 
 function getModuleCachePath(entryFileHash) {
-  path.resolve(tmpdir, entryFileHash + '.modules.cache.json');
+  return path.resolve(tmpdir, entryFileHash + '.modules.cache.json');
 }
 
 function getBundleCachePath(entryFileHash) {
-  path.resolve(tmpdir, entryFileHash + '.bundle.cache.js');
+  return path.resolve(tmpdir, entryFileHash + '.bundle.cache.js');
 }
 
 function isNotEmptyString(str) { return str !== '' }
