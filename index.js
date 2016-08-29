@@ -155,14 +155,16 @@ function addRealPaths(filePaths) {
 }
 
 function clearCacheFiles(entryFileHash) {
-  fs.unlinkSync(getModuleCachePath(entryFileHash))
-  fs.unlinkSync(getModuleCachePath(entryFileHash))
-  console.log('[racer-bundle] Watchify cache cleared.')
+  var cachePaths = [getModuleCachePath(entryFileHash), getBundleCachePath(entryFileHash)];
+  cachePaths.forEach(function(cachePath) {
+    if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+  })
+  console.log('[racer-bundle] Watchify cache cleared.');
 }
 
 function getModuleCache(entryFileHash) {
-  console.log('[racer-bundle] Loading watchify cache')
-  return watchify.getCache(getModuleCachePath(entryFileHash))
+  console.log('[racer-bundle] Loading watchify cache');
+  return watchify.getCache(getModuleCachePath(entryFileHash));
 }
 
 function getModuleCachePath(entryFileHash) {
