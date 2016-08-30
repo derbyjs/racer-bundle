@@ -24,7 +24,6 @@ function bundle(entryFile, options, cb) {
 
   var entryFileHash = hashFilename(entryFile);
   var ignorePaths = addRealPaths(options.ignore || []);
-  var matchIgnorePaths = anymatch(ignorePaths);
   var minify = (options.minify == null) ? util.isProduction : options.minify;
 
   options.useCache = !!options.useCache || !!process.env.USE_CACHE
@@ -71,6 +70,7 @@ function wrapBundle(b, entryFileHash, ignorePaths, rebundle) {
   };
   watchify(b, watchifyOptions);
   // Rebundle whenever a file is changed unless explicitly ignored
+  var matchIgnorePaths = anymatch(ignorePaths);
   b.on('update', function(ids) {
     console.log('[racer-bundle] Files changed:', ids.toString());
     if (ids.every(matchIgnorePaths)) {
