@@ -159,7 +159,7 @@ function clearCacheFiles(entryFileHash) {
   cachePaths.forEach(function(cachePath) {
     if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
   })
-  console.log('[racer-bundle] Watchify cache cleared.');
+  console.log('[racer-bundle] Watchify cache cleared');
 }
 
 function getModuleCache(entryFileHash) {
