@@ -45,13 +45,9 @@ function bundle(entryFile, options, cb) {
   var initialBundle = _callBundle.bind(null, cb)
   var rebundle = _callBundle.bind(null, options.onRebundle);
 
-  // Wrap browserify with caching/watching logic if requested
-  var useWatchify = options.onRebundle || options.useCache
-
   if (options.onRebundle) {
     wrapBundle(b, entryFileHash, ignorePaths, rebundle)
-  }
-  if (options.useCache) {
+  } else if (options.useCache) {
     wrapBundle(b, entryFileHash, ignorePaths)
   }
 
