@@ -71,28 +71,13 @@ function callBundle(b, minify, cb) {
     source = convertSourceMap.removeComments(source);
     if (!minify) return cb(null, source, map);
 
-    // If inSourceMap is a string it is assumed to be a filename, but passing in
-    // as an object avoids the need to make a file
-    var inSourceMap = JSON.parse(map);
     var result = uglify.minify(source, {
-      fromString: true,
-      outSourceMap: 'map',
-      inSourceMap: inSourceMap,
-      compress: false
+      sourceMap: {
+        content: map,
+        includeSources: true
+      }
     });
-
-    var mapObject = JSON.parse(result.map);
-    // Uglify doesn't include the source content in the map, so copy over from
-    // the map that browserify generates. However, before doing this, we must
-    // first remove any empty sourceContent items since UglifyJS ignores those
-    // files when populating the outSourceMap.sources array.
-    mapObject.sourcesContent = inSourceMap.sourcesContent.filter(isNotEmptyString)
-    if (mapObject.sources.length != mapObject.sourcesContent.length) {
-      console.error('Invalid sourcemap detected. sources.length does not match sourcesContent.length')
-    }
-    var map = JSON.stringify(mapObject);
-    cb(null, result.code, map);
+    if (result.error) return cb(result.error);
+    cb(null, result.code, result.map);
   });
 }
-
-function isNotEmptyString(str) { return str !== '' }
