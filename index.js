@@ -1,9 +1,8 @@
-var fs = require('fs');
+var Buffer = require('buffer').Buffer;
+var Writable = require('stream').Writable;
+var exorcist = require('exorcist');
 var browserify = require('browserify');
-var watchify = require('watchify');
-var uglify = require('uglify-js');
-var convertSourceMap = require('convert-source-map');
-var anymatch = require('anymatch');
+var minifyStream = require('minify-stream');
 
 var util;
 module.exports = function(racer) {
@@ -17,67 +16,45 @@ function bundle(file, options, cb) {
     cb = options;
     options = null;
   }
-  options || (options = {});
-  options.debug = true;
+  options = Object.assign({}, options, {debug: true});
   var minify = (options.minify == null) ? util.isProduction : options.minify;
-  // These objects need to be defined otherwise watchify disables its cache
-  options.cache = {};
-  options.packageCache = {};
 
   var b = browserify(options);
   this.emit('bundle', b);
   b.add(file);
 
-  // If onRebundle is defined, watch the bundle for changes
-  if (options.onRebundle) {
-    var w = watchify(b, {
-      delay: 100,
-    });
+  var bundleStream = (minify) ?
+    b.plugin('common-shakeify')
+      .plugin('browser-pack-flat/plugin')
+      .bundle()
+      .pipe(minifyStream()) :
+    b.bundle();
 
-    w.on('log', function (msg) {
-      console.log(file + ' bundled:', msg);
-    });
+  var sourceStream = new BufferStream();
+  var sourceMapStream = new BufferStream();
+  bundleStream
+    .pipe(exorcist(sourceMapStream, '/'))
+    .pipe(sourceStream);
 
-    var ignore = (options.ignore == null) ? [] : options.ignore
-    // Chokidar/watchify provide the realpath's of files as their ids, so we
-    //  add any realpath values that don't match the provided filepath's.
-    ignore.forEach(function(filepath) {
-      var realpath = fs.realpathSync(filepath);
-      if (realpath !== filepath) ignore.push(realpath);
-    });
-    var matchIgnorePaths = anymatch(ignore)
-    // This gets fired every time a dependent file is changed
-    w.on('update', function(ids) {
-      console.log('Files changed:', ids.toString());
-      // If all the changed files are ignoreable, return before bundling
-      if (ids.every(matchIgnorePaths)) {
-        return console.log('Ignoring update')
-      }
-      callBundle(this, minify, options.onRebundle);
-    });
-
-    callBundle(w, minify, cb);
-  } else {
-    callBundle(b, minify, cb);
-  }
-}
-
-function callBundle(b, minify, cb) {
-  b.bundle(function(err, buffer) {
-    if (err) return cb(err);
-    // Extract the source map, which Browserify includes as a comment
-    var source = buffer.toString('utf8');
-    var map = convertSourceMap.fromSource(source).toJSON();
-    source = convertSourceMap.removeComments(source);
-    if (!minify) return cb(null, source, map);
-
-    var result = uglify.minify(source, {
-      sourceMap: {
-        content: map,
-        includeSources: true
-      }
-    });
-    if (result.error) return cb(result.error);
-    cb(null, result.code, result.map);
+  sourceStream.on('finish', function() {
+    var source = sourceStream.toString()
+      // Remove the sourceMappingURL inserted by exorcist
+      .replace(/\n\/\/# sourceMappingURL=.*/, '');
+    var sourceMap = sourceMapStream.toString();
+    cb(null, source, sourceMap);
   });
 }
+
+function BufferStream() {
+  Writable.call(this);
+  this.chunks = [];
+}
+BufferStream.prototype = Object.create(Writable.prototype);
+BufferStream.prototype.constructor = BufferStream;
+BufferStream.prototype._write = function(chunk, encoding, callback) {
+  this.chunks.push(chunk);
+  callback();
+};
+BufferStream.prototype.toString = function() {
+  return Buffer.concat(this.chunks).toString();
+};
